@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= title %></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel='stylesheet' href='/stylesheets/bootstrap.min.css' />
+    <link rel='stylesheet' href='/stylesheets/slider.css' />
+    <style type="text/css">
+	#deviceform{
+		border: 1px solid #ccc; padding:10px; margin-top:10px; border-radius:5px;clear:left;
+	}
+	.device_box{
+		border: 1px solid #ccc; padding:10px; margin:0 10px 10px 0; border-radius:5px; float:left; width:199px
+	}
+	@media only screen and (max-width: 480px){.device_box{width:100%;}}
+    </style>
+    <script type="text/javascript" src="/javascripts/jquery.min.js"></script>
+    <script type="text/javascript" src="/javascripts/bootstrap.min.js"></script>
+    <script type="text/javascript" src="/javascripts/bootstrap-slider.js"></script>
+    <script type="text/javascript" src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+<div class="navbar navbar-inverse" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">socket.io Test</a>
+        </div>
+        <div class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+            <li class="active"><a href="#">Home</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+<div class="container" role="main">
+	<div class="jumbotron">
+        <h1>Hello, <%= title %>!</h1>
+	    <div id="devices"></div>
+        <form id="deviceform" style="">
+		<div class="form-group" id="devicekey">
+		  <label class="control-label" for="key">Device Key</label>
+		  <input type="text" class="form-control" id="key">
+		</div>
+		<div class="form-group" id="devicesecret">
+		  <label class="control-label" for="secret">Device Secret</label>
+		  <input type="text" class="form-control" id="secret">
+		</div>
+        <input type="submit" class="btn btn-primary btn-lg" value="Log In Device"></input></form>
+        <pre id="users" style="margin-top:10px;"></pre>
+        <pre id="rooms"></pre>
+        <pre id="news"><b>Messages:</b><br></pre>
+
+
+      </div>
+</div>
+   
+    <script>
+    jQuery(function($){
+	    var socket = io.connect();
+	    var $deviceform = $('#deviceform');
+	    var $devicekey = $('#key');
+	    var $devicesecret = $('#secret');
+
+	    $deviceform.submit(function(e){
+	    	e.preventDefault();
+	    	$('#devicekey').removeClass('has-error');
+	    	$('#devicesecret').removeClass('has-error');
+	    	if($devicekey.val()!='' && $devicesecret.val()!=''){
+	    	socket.emit('device login', {key: $devicekey.val().trim(), secret: $devicesecret.val().trim()});
+	    	$devicekey.val('');
+	    	$devicesecret.val('');
+	   		}else{
+			   		if($devicekey.val()==''){
+			   			$('#devicekey').addClass('has-error');
+			   		}
+			   		if($devicesecret.val()==''){
+			   			$('#devicesecret').addClass('has-error');
+			   		}
+			   	}
+
+	    });
+
+	    socket.on('news', function (data) {
+	      $('pre#news').append(data+'<br/>');
+	      console.log(data);
+	    });
+
+	    socket.on('userlist', function (data) {
+	    	$('pre#users').html('<b>Users:</b><br>');
+	    	for(i=0;i<data.length;i++){
+	    		if(data[i]==socket.socket.sessionid){
+	    		$('pre#users').append('<span style="color:darkgreen">'+data[i]+' (me)</span><br/>');
+	    		}else{
+	    		$('pre#users').append('<span style="">'+data[i]+'</span><br/>');
+	    		}
+	  		}
+	    });	    
+
+	    socket.on('roomlist', function (data) {
+	    	if(data.length<=1){
+	    		$('pre#rooms').hide();
+	    	}else{
+	    		$('pre#rooms').show();
+		    	$('pre#rooms').html('<b>Rooms:</b>');
+		    	for(i=0;i<data.length;i++){
+		    		$('pre#rooms').append('<span style="">'+data[i]+'</span><br/>');	    		
+		    	}
+	  		}
+	    });
+
+
+	    socket.on('devices', function (data) {
+		    $('div#devices').append('<div id="device_'+data.key+'_box" class="device_box"><p style="font-size:small;margin-bottom:5px"><span class="badge" style="background-color: #ddd;"><span id="device_'+data.key+'_status" class="glyphicon glyphicon-off" style="color:'+((data.online)?'#5cb85c':'#d9534f')+'"></span></span> <b id="device_'+data.key+'_label">'+data.name+'</b></p><pre id="device_'+data.key+'_key">Key: '+data.key+'</pre><div id="device_'+data.key+'_dim" style="margin:16px 11px 17px"><input type="text" id="device_'+data.key+'_dimvalue" value="" data-slider-min="0" data-slider-max="100" data-slider-step="1" data-slider-value="" data-slider-orientation="horizontal" data-slider-selection="after" data-slider-tooltip="show"></div><div id="device_'+data.key+'_allowdim" style="margin-top:5px;margin-bottom:10px;display:none" class="btn-group"><button type="button" class="btn disabled" style="width: 86px;">Dimming</button><button type="button" id="device_'+data.key+'_dimyes" class="btn'+((data.dimming)?' btn-success':'')+'">Yes</button><button type="button" id="device_'+data.key+'_dimno" class="btn'+((data.dimming)?'':' btn-danger')+'">No</button></div><div class="btn-group" id="device_'+data.key+'_buttons"><button type="button" name="device_'+data.key+'" data-active="btn-danger" id="device_'+data.key+'_off" class="btn">Off</button><button type="button" name="device_'+data.key+'" data-active="btn-warning" id="device_'+data.key+'_dimmer" class="btn">Dim</button><button type="button" name="device_'+data.key+'" data-active="btn-success" id="device_'+data.key+'_on" class="btn">On</button><button type="button" id="device_'+data.key+'_settings" class="btn" style="background-color:#999;color:#fff"><span class="glyphicon glyphicon-cog"></span></button></div><div class="input-group" style="display:none" id="device_'+data.key+'_nameform"><input type="text" class="form-control" id="device_'+data.key+'_name" value="'+data.name+'"><span class="input-group-btn"><button id="device_'+data.key+'_save" class="btn btn-primary" type="button">Save</button></span></div></div>');
+
+		    $('#device_'+data.key+'_dimvalue').slider('setValue', ((data.value==='on' || data.value==='off')?'0':data.value));
+		    $('#device_'+data.key+'_dimvalue').slider()
+			  .on('slide', function(ev){
+	    		socket.emit('devices', {key: data.key, secret: data.secret, value: $('#device_'+data.key+'_dimvalue').val()});
+		    	buttonstate(data.key, 'dimmer');
+
+			  });
+
+		    	$('#device_'+data.key+'_dim').hide();
+
+		    $('#device_'+data.key+'_settings').click(function(){
+		    	$('#device_'+data.key+'_dim').hide();
+		    	$('#device_'+data.key+'_buttons').hide();
+		    	$('#device_'+data.key+'_nameform').show();
+		    	$('#device_'+data.key+'_key').hide();
+		    	$('#device_'+data.key+'_allowdim').show();
+		    });
+
+		    //------------------------------------ Test
+		    $('#device_'+data.key+'_status').click(function(){
+		    	socket.emit('device online', {key: data.key, secret: data.secret, online: true});
+		    });
+		    //------------------------------------
+
+		    $('#device_'+data.key+'_save').click(function(){
+		    	socket.emit('device name', {key: data.key, secret: data.secret, name: $('#device_'+data.key+'_name').val()});
+			    $('#device_'+data.key+'_name').val($('#device_'+data.key+'_name').val());
+				$('#device_'+data.key+'_label').html($('#device_'+data.key+'_name').val());
+		    	$('#device_'+data.key+'_buttons').show();
+		    	$('#device_'+data.key+'_nameform').hide();
+		    	$('#device_'+data.key+'_key').show();
+		    	$('#device_'+data.key+'_allowdim').hide();
+		    });
+
+			if(data.value==='on'||data.value==='off'){
+	   			buttonstate(data.key, data.value);
+	   		}else{
+	   			buttonstate(data.key, 'dimmer');
+	   		}
+
+	   		if(data.dimming){
+	   		$('#device_'+data.key+'_dimmer').removeClass('disabled');
+	   		}else{
+	   		$('#device_'+data.key+'_dimmer').addClass('disabled');
+	   		}
+
+			$('#device_'+data.key+'_on').click(function(){
+		    		socket.emit('devices', {key: data.key, secret: data.secret, value: 'on'});
+		    	$('#device_'+data.key+'_dim').hide();
+		    	$('#device_'+data.key+'_key').show();
+		    	buttonstate(data.key, 'on');
+	    	});			
+	    	$('#device_'+data.key+'_dimmer').click(function(){
+	    		$('#device_'+data.key+'_key').toggle();
+		    	$('#device_'+data.key+'_dim').toggle();
+
+	    	});			
+	    	$('#device_'+data.key+'_off').click(function(){
+	    		socket.emit('devices', {key: data.key, secret: data.secret, value: 'off'});
+		    	$('#device_'+data.key+'_dim').hide();
+		    	$('#device_'+data.key+'_key').show();
+		    	buttonstate(data.key, 'off');
+	    	});
+	    	$('#device_'+data.key+'_dimyes').click(function(){
+	    		socket.emit('device dimming', {key: data.key, secret: data.secret, dimming: true});
+	    		$('#device_'+data.key+'_dimmer').removeClass('disabled');
+	    		$('#device_'+data.key+'_dimyes').addClass('btn-success');
+	    		$('#device_'+data.key+'_dimno').removeClass('btn-danger');
+	    		$('#device_'+data.key+'_buttons').show();
+		    	$('#device_'+data.key+'_nameform').hide();
+		    	$('#device_'+data.key+'_key').show();
+		    	$('#device_'+data.key+'_allowdim').hide();
+
+	    	});
+	    	$('#device_'+data.key+'_dimno').click(function(){
+	    		socket.emit('device dimming', {key: data.key, secret: data.secret, dimming: false});
+	    		$('#device_'+data.key+'_dimmer').addClass('disabled');
+	    		$('#device_'+data.key+'_dimyes').removeClass('btn-success');
+	    		$('#device_'+data.key+'_dimno').addClass('btn-danger');
+	    		$('#device_'+data.key+'_buttons').show();
+		    	$('#device_'+data.key+'_nameform').hide();
+		    	$('#device_'+data.key+'_key').show();
+		    	$('#device_'+data.key+'_allowdim').hide();
+	    		socket.emit('devices', {key: data.key, secret: data.secret, value: 'off'});
+	    		buttonstate(data.key, 'off');
+	    	});
+	    });
+
+	    socket.on('action', function (data) {
+	    	if(data.value==='on'||data.value==='off'){
+	    		buttonstate(data.key, data.value);
+		    	$('#device_'+data.key+'_key').show();
+		    	$('#device_'+data.key+'_dim').hide();
+	    	}else{
+	    		buttonstate(data.key, 'dimmer');
+	    		$('#device_'+data.key+'_dimvalue').slider('setValue',data.value);
+	    	}
+	    });
+
+	    socket.on('device name', function (data) {
+		$('#device_'+data.key+'_name').val(data.name);
+		$('#device_'+data.key+'_label').html(data.name);
+		});
+
+	    socket.on('device online', function (data) {
+	    if(data.online){
+	    	$('#device_'+data.key+'_status').css('color', '#5cb85c');
+	    	}else{
+	    	$('#device_'+data.key+'_status').css('color', '#d9534f');
+	    	}
+		});
+
+	    socket.on('device dimming', function (data) {
+	    if(data.dimming){
+	    		$('#device_'+data.key+'_dimmer').removeClass('disabled');
+	    		$('#device_'+data.key+'_dimyes').addClass('btn-success');
+	    		$('#device_'+data.key+'_dimno').removeClass('btn-danger');
+	    	}else{
+	    		$('#device_'+data.key+'_dimmer').addClass('disabled');
+	    		$('#device_'+data.key+'_dimyes').removeClass('btn-success');
+	    		$('#device_'+data.key+'_dimno').addClass('btn-danger');
+	    	}
+		});
+
+	    function buttonstate(key,value){
+	    	if(value){
+	    		$('[name="device_'+key+'"]').removeClass(function (index, css) {
+    				return (css.match (/\bbtn-\S+/g) || []).join(' ');
+				});
+	    		$('#device_'+key+'_'+value).addClass($('#device_'+key+'_'+value).data('active'));
+	    	}
+	    }
+
+	    	// window.socket = socket;    			
+
+    });
+</script>
+  </body>
+</html>
